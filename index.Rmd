@@ -1,0 +1,59 @@
+---
+title: Gridded OBIS data in R
+date: "`r Sys.Date()`"
+author: Pieter Provoost
+output: (function(...) {
+  rmdformats::robobook(toc_depth = 4, fig_caption = FALSE, pandoc_args = c("+RTS", "-K2000m", "-RTS"), ...) })
+editor_options: 
+  chunk_output_type: console
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding, output_dir = "docs") })  
+---
+
+The robis R package currently does not provide access to gridded OBIS data, but fetching gridded data from the API is straightforward. In this short notebook we will fetch gridded data for a single species and visualize it using Leaflet and ggplot2.
+
+First load some required packages.
+
+```{r message=FALSE, warning=FALSE}
+library(httr)
+library(dplyr)
+library(leaflet)
+library(geojsonsf)
+library(ggplot2)
+library(rnaturalearth)
+library(sf)
+library(glue)
+library(viridis)
+```
+
+The API endpoint for gridded data looks like this: `https://api.obis.org/occurrence/grid/{res}` where `res` is the Geohash resolution. Construct a URL, fetch the data, and convert to sf:
+
+```{r message=FALSE, warning=FALSE}
+res <- 3
+taxon <- "Abra alba"
+
+url <- glue("https://api.obis.org/occurrence/grid/{res}?scientificname={taxon}")
+json <- GET(URLencode(url)) %>% content(as = "text")
+sf <- geojson_sf(json)
+```
+
+This creates an Leaflet based web map:
+
+```{r message=FALSE, warning=FALSE}
+leaflet(sf) %>%
+  addProviderTiles("Esri.OceanBasemap") %>%
+  addPolygons(weight = 1, color = "#cc3300")
+```
+
+And here's how to visualize the sf object using ggplot2:
+
+```{r message=FALSE, warning=FALSE}
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+ggplot() + 
+  geom_sf(data = world, size = 0) +
+  geom_sf(data = sf, aes(fill = n, size = NA)) +
+  coord_sf(crs = st_crs("ESRI:54030")) +
+  scale_fill_viridis(trans = "log10") +
+  theme_void()
+```  
